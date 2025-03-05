@@ -1,9 +1,14 @@
-import cv2
+import cv2 as cv2
+from utils import load_image, convert_to_grayscale, detect_edges, show_image
 
-image = cv2.imread('data/speed_limit_50.png')
+# Load image
+image = load_image("data/37/037_1_0001.png")
 
-gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+# Convert to grayscale
+gray_image = convert_to_grayscale(image)
 
-cv2.imshow('Gray Image', gray)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
+# Detect edges
+edges = detect_edges(gray_image)
+
+# Show results
+show_image("Edges", edges)
