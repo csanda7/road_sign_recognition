@@ -5,17 +5,17 @@ from utils import (
     show_image, apply_gaussian_blur, find_contours, draw_contours
 )
 
-# Define the root directory
+#Root directory
 root_dir = "data"
 
-# Loop through all subdirectories and files
+# Go through all the files in the directories
 for subdir, _, files in os.walk(root_dir):
     for file in files:
-        if file.lower().endswith((".png")):  # Process only image files
+        if file.lower().endswith((".png")):  # Deal with the .png files only
             file_path = os.path.join(subdir, file)
             print(f"Processing: {file_path}")
 
-            # Load and process the image
+            # Load and edit the image
             image = load_image(file_path)
             gray_image = convert_to_grayscale(image)
             blurred = apply_gaussian_blur(gray_image)
@@ -23,10 +23,10 @@ for subdir, _, files in os.walk(root_dir):
             found_contours = find_contours(edges)
             contour = draw_contours(image, found_contours)
 
-            # Show results
+            #SHow the iamnge
             cv2.imshow(f"Processed - {file}", contour)
 
-            # Wait for a key press, exit if 'Esc' is pressed
+            # Press Esc to exit
             key = cv2.waitKey(0)  
             cv2.destroyAllWindows()
             
