@@ -4,12 +4,6 @@ from utils import (
     load_image,convert_to_hsv, classify_color, detect_color
 )
 
-#   Colors conversion to HSV instead of RGB:
-#   the piros color is represented between: 0-179
-#   the blue color is represented between: 100-130
-#   the yellow color is represented between: 20-30
-
-
 #Root directory
 root_dir = "DATA"
 kor = 0
@@ -17,6 +11,7 @@ haromszog = 0
 negyszog = 0
 hatszog = 0
 nem_ismert = 0
+image_id =1
 
 # Go through all the files in the directories
 for subdir, _, files in os.walk(root_dir):
@@ -34,7 +29,7 @@ for subdir, _, files in os.walk(root_dir):
                 perimeter = cv2.arcLength(largest_edges, True) 
                 #print(f"Perimeter: {perimeter}")
             
-            approx = cv2.approxPolyDP(largest_edges, 0.025 * perimeter, True)
+            approx = cv2.approxPolyDP(largest_edges, 0.02 * perimeter, True) # 2%-kal közelítjük a kontúrt
             sides = len(approx)
 
 
@@ -54,18 +49,12 @@ for subdir, _, files in os.walk(root_dir):
                 shape = "Nem ismert"
                 nem_ismert += 1
 
+            print(f"#{image_id}")
+            image_id += 1
             print(f"A tábla alakja: {shape}")
 
 
             hsv_image = convert_to_hsv(image)
-            # Define HSV ranges for colors
-            # color_ranges = {
-            #     "piros": [(0, 70, 50), (10, 255, 255)],     # piros (lower range)
-            #     "piros2": [(170, 70, 50), (180, 255, 255)], # piros (upper range)
-            #     "blue": [(100, 150, 50), (130, 255, 255)],
-            #     "yellow": [(20, 100, 100), (30, 255, 255)]
-            # }
-
             masks = detect_color(hsv_image)
             dominant_color = classify_color(masks)
             print(f"A domináns szín: {dominant_color}")
@@ -75,6 +64,7 @@ for subdir, _, files in os.walk(root_dir):
 
             #SHow the iamnge
             cv2.imshow(f"Feldolgozva - {file}", image)
+            print("*************************************************")
 
             # Press Esc to exit
             key = cv2.waitKey(0)  
