@@ -1,5 +1,6 @@
 import cv2
 import os
+import numpy as np
 
 
 #Defining the functions
@@ -28,14 +29,16 @@ def apply_threshold(image, threshold=127):
     _, binary = cv2.threshold(image, threshold, 255, cv2.THRESH_BINARY)
     return binary
 
-def find_contours(image):
-    contours, _ = cv2.findContours(image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    return contours
+def find_edgess(image):
+    edgess, _ = cv2.findedgess(image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    return edgess
 
-def draw_contours(image, contours):
-    return cv2.drawContours(image.copy(), contours, -1, (0, 255, 0), 2)
+def draw_edgess(image, edgess):
+    return cv2.drawedgess(image.copy(), edgess, -1, (0, 255, 0), 1)
 
 def show_image(title, image):
     cv2.imshow(title, image)
-    cv2.waitKey(0)
+    #cv2.waitKey(0)
     cv2.destroyAllWindows()
+
+    
