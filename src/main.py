@@ -1,11 +1,11 @@
 import cv2 as cv2
 import os
 from utils import (
-    load_image
+    load_image,convert_to_hsv, classify_color, detect_color
 )
 
 #   Colors conversion to HSV instead of RGB:
-#   the red color is represented between: 0-179
+#   the piros color is represented between: 0-179
 #   the blue color is represented between: 100-130
 #   the yellow color is represented between: 20-30
 
@@ -37,7 +37,6 @@ for subdir, _, files in os.walk(root_dir):
             approx = cv2.approxPolyDP(largest_edges, 0.025 * perimeter, True)
             sides = len(approx)
 
-          
 
             if sides == 3:
                 shape = "Háromszög"
@@ -55,19 +54,39 @@ for subdir, _, files in os.walk(root_dir):
                 shape = "Nem ismert"
                 nem_ismert += 1
 
-            #print(f"A tábla alakja: {shape}")
+            print(f"A tábla alakja: {shape}")
+
+
+            hsv_image = convert_to_hsv(image)
+            # Define HSV ranges for colors
+            # color_ranges = {
+            #     "piros": [(0, 70, 50), (10, 255, 255)],     # piros (lower range)
+            #     "piros2": [(170, 70, 50), (180, 255, 255)], # piros (upper range)
+            #     "blue": [(100, 150, 50), (130, 255, 255)],
+            #     "yellow": [(20, 100, 100), (30, 255, 255)]
+            # }
+
+            masks = detect_color(hsv_image)
+            dominant_color = classify_color(masks)
+            print(f"A domináns szín: {dominant_color}")
+            #for color, mask in masks.items():
+                #cv2.imshow(f"Maszk: {color}", hsv_image)
+
+
             #SHow the iamnge
-            #cv2.imshow(f"Feldolgozva - {file}", edges)
+            cv2.imshow(f"Feldolgozva - {file}", image)
 
             # Press Esc to exit
-            # key = cv2.waitKey(0)  
-            # cv2.destroyAllWindows()
+            key = cv2.waitKey(0)  
+            cv2.destroyAllWindows()
             
-            # if key == 27:  # ASCII code for Esc key
-            #     print("Kiléptél a programból az Esc megnyomásával.")
-            #     exit()
-print(f"Körök száma: {kor}")
-print(f"Háromszögek száma: {haromszog}")    
-print(f"Négyszögek száma: {negyszog}")
-print(f"Hatszögek száma: {hatszog}")
-print(f"Nem ismert alakzatok száma: {nem_ismert}")
+            if key == 27:  # ASCII code for Esc key
+                print("Kiléptél a programból az Esc megnyomásával.")
+                exit()
+
+
+print(f"Körök száma: {kor}") #Összesen 464 kör van a képeken
+print(f"Háromszögek száma: {haromszog}")   #0 háromszög van a képeken 
+print(f"Négyszögek száma: {negyszog}") #29 négyszög van a képeken
+print(f"Hatszögek száma: {hatszog}") # 19 hatszög van a képeken
+print(f"Nem ismert alakzatok száma: {nem_ismert}") # 0 nem ismert alakzat van a képeken
