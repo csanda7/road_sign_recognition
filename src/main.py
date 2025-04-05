@@ -1,82 +1,91 @@
-import cv2 as cv2
 import os
+import random
+import cv2
+import numpy as np
+
 from utils import (
-    load_image,convert_to_hsv, classify_color, detect_color
+    load_image,
+    convert_to_hsv,
+    detect_color,
+    classify_color,
+    extract_sift_features,
+    match_features,
+    compute_homography,
+    build_reference_data
 )
 
-#Root directory
-root_dir = "DATA"
-kor = 0
-haromszog = 0
-negyszog = 0
-hatszog = 0
-nem_ismert = 0
-image_id =1
-
-# Go through all the files in the directories
-for subdir, _, files in os.walk(root_dir):
-    for file in files:
-        if file.lower().endswith((".png", "jpg", "jpeg")):  # Deal with the .png .jpg .jpeg files only
-            file_path = os.path.join(subdir, file)
-            #print(f"Feldolgozás: {file_path}")
-
-            # Load and using canny on the image
-            image = load_image(file_path)
-            edges = cv2.Canny(image, 100, 200)
-            contour, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            if contour:  # Ellenőrizzük, hogy van-e legalább egy kontúr
-                largest_edges = max(contour, key=cv2.contourArea)  # Kiválasztjuk a legnagyobb kontúrt
-                perimeter = cv2.arcLength(largest_edges, True) 
-                #print(f"Perimeter: {perimeter}")
-            
-            approx = cv2.approxPolyDP(largest_edges, 0.02 * perimeter, True) # 2%-kal közelítjük a kontúrt
-            sides = len(approx)
+folder_sign_types = {
+    "0": "Alárendelt utak kereszteződése",
+    "1": "100-as sebességkorlátozó tábla",
+    "2": "80-as sebességkorlátozó tábla",
+    "3": "Főútvonal",
+    "4": "STOP tábla",
+    "5": "Körforgalom"
+}
 
 
-            if sides == 3:
-                shape = "Háromszög"
-                haromszog += 1
-            elif sides == 4:
-                shape = "Négyszög"
-                negyszog += 1
-            elif sides == 6:
-                shape = "Hatszög"
-                hatszog += 1
-            elif sides >= 8:
-                shape = "Kör"
-                kor += 1
-            else:
-                shape = "Nem ismert"
-                nem_ismert += 1
+def main():
+    reference_dir = "../DATA"
+    reference_data = build_reference_data(reference_dir)
 
-            print(f"#{image_id}")
-            image_id += 1
-            print(f"A tábla alakja: {shape}")
+    test_dir = "../TEST_DATA"
+    test_files = [f for f in os.listdir(test_dir) if f.lower().endswith((".png", ".jpg", ".jpeg"))]
+    if not test_files:
+        print("Nincs teszt kép a TEST_DATA mappában.")
+        return
 
+    random_file = random.choice(test_files)
+    file_path = os.path.join(test_dir, random_file)
+    image = load_image(file_path)
+    if image is None:
+        print(f"Nem sikerült betölteni a teszt képet: {file_path}")
+        return
 
-            hsv_image = convert_to_hsv(image)
-            masks = detect_color(hsv_image)
-            dominant_color = classify_color(masks)
-            print(f"A domináns szín: {dominant_color}")
-            #for color, mask in masks.items():
-                #cv2.imshow(f"Maszk: {color}", hsv_image)
+    # Nem vágjuk ki a táblát, az egész képet használjuk
+    test_keypoints, test_descriptors = extract_sift_features(image)
 
+    hsv_image = convert_to_hsv(image)
+    masks = detect_color(hsv_image)
+    dominant_color = classify_color(masks)
 
-            #SHow the iamnge
-            cv2.imshow(f"Feldolgozva - {file}", image)
-            print("*************************************************")
+    MIN_MATCH_COUNT = 10
+    best_match_type = None
+    best_match_file = None
+    best_inliers = 0
+    best_good_matches = []
 
-            # Press Esc to exit
-            key = cv2.waitKey(0)  
-            cv2.destroyAllWindows()
-            
-            if key == 27:  # ASCII code for Esc key
-                print("Kiléptél a programból az Esc megnyomásával.")
-                exit()
+    for sign_type, ref_list in reference_data.items():
+        for ref in ref_list:
+            ref_keypoints = ref["keypoints"]
+            ref_descriptors = ref["descriptors"]
+            good_matches = match_features(test_descriptors, ref_descriptors, ratio_thresh=0.75)
 
+            if len(good_matches) >= MIN_MATCH_COUNT:
+                H, mask = compute_homography(test_keypoints, ref_keypoints, good_matches)
+                if H is not None and mask is not None:
+                    inlier_count = int(np.sum(mask))
+                    if inlier_count > best_inliers:
+                        best_inliers = inlier_count
+                        best_match_type = sign_type
+                        best_match_file = ref["filename"]
+                        best_good_matches = good_matches
 
-print(f"Körök száma: {kor}") #Összesen 464 kör van a képeken
-print(f"Háromszögek száma: {haromszog}")   #0 háromszög van a képeken 
-print(f"Négyszögek száma: {negyszog}") #29 négyszög van a képeken
-print(f"Hatszögek száma: {hatszog}") # 19 hatszög van a képeken
-print(f"Nem ismert alakzatok száma: {nem_ismert}") # 0 nem ismert alakzat van a képeken
+    if best_match_type:
+        readable_sign_type = folder_sign_types.get(best_match_type, best_match_type)
+        confidence = best_inliers / len(best_good_matches) if best_good_matches else 0.0
+    else:
+        readable_sign_type = "Nem azonosítható"
+        confidence = 0.0
+
+    print(f"Tesztkép: {random_file}")
+    print(f"A domináns szín: {dominant_color}")
+    print(f"A tábla típusa: {readable_sign_type}, \nKonfidencia: {confidence:.2f}")
+
+    cv2.imshow("Tesztkép", image)
+    key = cv2.waitKey(0)
+    cv2.destroyAllWindows()
+    if key == 27:
+        print("Kiléptél az Esc gomb megnyomásával.")
+
+if __name__ == "__main__":
+    main()

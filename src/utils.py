@@ -2,89 +2,100 @@ import cv2
 import os
 import numpy as np
 
-
-
 def load_image(image_path):
-    if not os.path.exists(image_path):
-        raise FileNotFoundError(f"File not found: {image_path}")
-    return cv2.imread(image_path)
-
-
-def show_image(title, image):
-    cv2.imshow(title, image)
-    #cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    image = cv2.imread(image_path)
+    if image is None:
+        print(f"Nem sikerült betölteni a képet: {image_path}")
+    return image
 
 def convert_to_hsv(image):
     return cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-
-#   Colors conversion to HSV instead of RGB:
-#   the piros color is represented between: 0-179
-#   the blue color is represented between: 100-130
-#   the yellow color is represented between: 20-30
-
-color_ranges = {
-                "piros": [(0, 70, 50), (10, 255, 255)],     # piros (lower range)
-                "piros2": [(170, 70, 50), (180, 255, 255)], # piros (upper range)
-                "kék": [(100, 150, 50), (130, 255, 255)],
-                "sárga": [(20, 100, 100), (30, 255, 255)]
-            }
-
-
 def detect_color(hsv_image):
+
     masks = {}
-    
-    for color, (lower, upper) in color_ranges.items():
-        lower_bound = np.array(lower, dtype=np.uint8)
-        upper_bound = np.array(upper, dtype=np.uint8)
-        mask = cv2.inRange(hsv_image, lower_bound, upper_bound)
-        masks[color] = mask
-    
-    # Combine piros masks (since it has two ranges)
-    masks["piros"] = cv2.bitwise_or(masks["piros"], masks["piros2"])
-    del masks["piros2"]  # Remove pirosundant entry
-    
+
+    # Piros szín – két tartomány:
+    lower_red1 = np.array([0, 70, 50])
+    upper_red1 = np.array([10, 255, 255])
+    mask_red1 = cv2.inRange(hsv_image, lower_red1, upper_red1)
+
+    lower_red2 = np.array([170, 70, 50])
+    upper_red2 = np.array([180, 255, 255])
+    mask_red2 = cv2.inRange(hsv_image, lower_red2, upper_red2)
+
+    masks["Piros"] = cv2.bitwise_or(mask_red1, mask_red2)
+
+    # Kék szín
+    lower_blue = np.array([100, 150, 0])
+    upper_blue = np.array([140, 255, 255])
+    masks["Kék"] = cv2.inRange(hsv_image, lower_blue, upper_blue)
+
+    # Zöld szín
+    lower_green = np.array([40, 40, 40])
+    upper_green = np.array([70, 255, 255])
+    masks["Zöld"] = cv2.inRange(hsv_image, lower_green, upper_green)
+
+    # Sárga szín
+    lower_yellow = np.array([20, 100, 100])
+    upper_yellow = np.array([30, 255, 255])
+    masks["Sárga"] = cv2.inRange(hsv_image, lower_yellow, upper_yellow)
+
     return masks
 
 def classify_color(masks):
-    max_pixels = 0
-    dominant_color = "ismeretlen"
-    
+    max_color = None
+    max_count = 0
     for color, mask in masks.items():
-        pixel_count = cv2.countNonZero(mask)  # Count white pixels in mask
-        if pixel_count > max_pixels:
-            max_pixels = pixel_count
-            dominant_color = color
-    
-    return dominant_color
+        count = cv2.countNonZero(mask)
+        if count > max_count:
+            max_count = count
+            max_color = color
+    return max_color if max_color is not None else "Ismeretlen"
 
+def extract_sift_features(image):
 
+    sift = cv2.SIFT_create()
+    keypoints, descriptors = sift.detectAndCompute(image, None)
+    return keypoints, descriptors
 
-# def save_image(image, save_path):
-#     cv2.imwrite(save_path, image)
+def match_features(desc1, desc2, ratio_thresh=0.75):
+    if desc1 is None or desc2 is None:
+        return []
+    bf = cv2.BFMatcher()
+    matches = bf.knnMatch(desc1, desc2, k=2)
+    good_matches = []
+    for m, n in matches:
+        if m.distance < ratio_thresh * n.distance:
+            good_matches.append(m)
+    return good_matches
 
-# def resize_image(image, width, height):
-#     return cv2.resize(image, (width, height))
+def compute_homography(kp1, kp2, matches, ransac_thresh=8.0):
+    if len(matches) < 4:
+        return None, None
 
-# def convert_to_grayscale(image):
-#     return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    src_pts = np.float32([kp1[m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
+    dst_pts = np.float32([kp2[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
 
-# def apply_gaussian_blur(image, kernel_size=(5, 5)):
-#     return cv2.GaussianBlur(image, kernel_size, 0)
+    H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, ransac_thresh)
+    return H, mask
 
-# def detect_edges(image, low_threshold=50, high_threshold=150):
-#     return cv2.Canny(image, low_threshold, high_threshold)
-
-# def apply_threshold(image, threshold=127):
-#     _, binary = cv2.threshold(image, threshold, 255, cv2.THRESH_BINARY)
-#     return binary
-
-# def find_edgess(image):
-#     edgess, _ = cv2.findedgess(image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-#     return edgess
-
-# def draw_edgess(image, edgess):
-#     return cv2.drawedgess(image.copy(), edgess, -1, (0, 255, 0), 1)
-
-    
+def build_reference_data(reference_dir):
+    reference_data = {}
+    for folder in os.listdir(reference_dir):
+        folder_path = os.path.join(reference_dir, folder)
+        if os.path.isdir(folder_path):
+            sign_type = folder  
+            reference_data[sign_type] = []
+            for file in os.listdir(folder_path):
+                if file.lower().endswith((".png", ".jpg", ".jpeg")):
+                    image_path = os.path.join(folder_path, file)
+                    image = load_image(image_path)
+                    if image is not None:
+                        kp, desc = extract_sift_features(image)
+                        reference_data[sign_type].append({
+                            "filename": file,
+                            "keypoints": kp,
+                            "descriptors": desc
+                        })
+    return reference_data
