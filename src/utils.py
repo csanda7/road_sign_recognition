@@ -65,20 +65,38 @@ def match_features(desc1, desc2, ratio_thresh=0.75):
     bf = cv2.BFMatcher()
     matches = bf.knnMatch(desc1, desc2, k=2)
     good_matches = []
-    for m, n in matches:
+    for match in matches:
+        if len(match) < 2:
+            continue
+        m, n = match
         if m.distance < ratio_thresh * n.distance:
             good_matches.append(m)
     return good_matches
 
-def compute_homography(kp1, kp2, matches, ransac_thresh=8.0):
+def compute_homography(keypoints1, keypoints2, matches, ransac_threshold=8.0):
     if len(matches) < 4:
+        print("Not enough matches to compute a homography.")
         return None, None
 
-    src_pts = np.float32([kp1[m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
-    dst_pts = np.float32([kp2[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
+    source_points = []
+    for match in matches:
+        point = keypoints1[match.queryIdx].pt
+        source_points.append(point)
 
-    H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, ransac_thresh)
-    return H, mask
+    destination_points = []
+    for match in matches:
+        point = keypoints2[match.trainIdx].pt
+        destination_points.append(point)
+
+    source_points = np.array(source_points, dtype=np.float32)
+    destination_points = np.array(destination_points, dtype=np.float32)
+
+    source_points = source_points.reshape(-1, 1, 2)
+    destination_points = destination_points.reshape(-1, 1, 2)
+
+    homography_matrix, mask = cv2.findHomography(source_points, destination_points, cv2.RANSAC, ransac_threshold)
+
+    return homography_matrix, mask
 
 def build_reference_data(reference_dir):
     reference_data = {}

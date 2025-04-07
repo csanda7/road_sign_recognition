@@ -2,7 +2,6 @@ import os
 import random
 import cv2
 import numpy as np
-
 from utils import (
     load_image,
     convert_to_hsv,
@@ -29,7 +28,12 @@ def main():
     reference_data = build_reference_data(reference_dir)
 
     test_dir = "../TEST_DATA"
-    test_files = [f for f in os.listdir(test_dir) if f.lower().endswith((".png", ".jpg", ".jpeg"))]
+    all_files = os.listdir(test_dir)
+    test_files = []
+    for f in all_files:
+        lower_case_file = f.lower()
+        if lower_case_file.endswith(".png") or lower_case_file.endswith(".jpg") or lower_case_file.endswith(".jpeg"):
+            test_files.append(f)
     if not test_files:
         print("Nincs teszt kép a TEST_DATA mappában.")
         return
@@ -41,7 +45,6 @@ def main():
         print(f"Nem sikerült betölteni a teszt képet: {file_path}")
         return
 
-    # Nem vágjuk ki a táblát, az egész képet használjuk
     test_keypoints, test_descriptors = extract_sift_features(image)
 
     hsv_image = convert_to_hsv(image)
@@ -89,3 +92,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
