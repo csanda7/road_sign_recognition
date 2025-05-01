@@ -59,7 +59,7 @@ def extract_sift_features(image):
     keypoints, descriptors = sift.detectAndCompute(image, None)
     return keypoints, descriptors
 
-def match_features(desc1, desc2, ratio_thresh=0.75):
+def match_features(desc1, desc2, ratio_thresh=0.7):
     if desc1 is None or desc2 is None:
         return []
     bf = cv2.BFMatcher()
@@ -75,7 +75,7 @@ def match_features(desc1, desc2, ratio_thresh=0.75):
 
 def compute_homography(keypoints1, keypoints2, matches, ransac_threshold=8.0):
     if len(matches) < 4:
-        print("Not enough matches to compute a homography.")
+        print("Nincs elegendő egyezés.")
         return None, None
 
     source_points = []
@@ -111,6 +111,50 @@ def build_reference_data(reference_dir):
                     image = load_image(image_path)
                     if image is not None:
                         kp, desc = extract_sift_features(image)
+                        reference_data[sign_type].append({
+                            "filename": file,
+                            "keypoints": kp,
+                            "descriptors": desc
+                        })
+    return reference_data
+
+
+# ------------------------- ORB Functions -------------------------
+
+def extract_orb_features(image):
+
+    orb = cv2.ORB_create()
+    keypoints, descriptors = orb.detectAndCompute(image, None)
+    return keypoints, descriptors
+
+def match_orb_features(desc1, desc2, ratio_thresh=0.75):
+    if desc1 is None or desc2 is None:
+        return []
+    bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
+    matches = bf.knnMatch(desc1, desc2, k=2)
+    good_matches = []
+    for match in matches:
+        if len(match) < 2:
+            continue
+        m, n = match
+        if m.distance < ratio_thresh * n.distance:
+            good_matches.append(m)
+    return good_matches
+
+def build_reference_data_orb(reference_dir):
+
+    reference_data = {}
+    for folder in os.listdir(reference_dir):
+        folder_path = os.path.join(reference_dir, folder)
+        if os.path.isdir(folder_path):
+            sign_type = folder  
+            reference_data[sign_type] = []
+            for file in os.listdir(folder_path):
+                if file.lower().endswith((".png", ".jpg", ".jpeg")):
+                    image_path = os.path.join(folder_path, file)
+                    image = load_image(image_path)
+                    if image is not None:
+                        kp, desc = extract_orb_features(image)
                         reference_data[sign_type].append({
                             "filename": file,
                             "keypoints": kp,
