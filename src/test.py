@@ -18,6 +18,11 @@ from utils import (
 MIN_MATCH_COUNT = 10
 RATIO_THRESH = 0.85
 
+"""
+This script evaluates reference vs. test images using SIFT and ORB,
+then plots counts and average confidences per class.
+"""
+
 def classify(img, refs, extract_fn, match_fn):
     kps, desc = extract_fn(img)
     best_label, best_inliers, best_matches = "Nem azonosítható", 0, 0
@@ -43,10 +48,9 @@ def evaluate(ref_dir, test_dir, out_dir):
     }
     stats = {name: {} for name in refs}
 
-    # collect image paths for a proper progress bar
-    paths = [p for p in Path(test_dir).rglob("*") \
+    paths = [p for p in Path(test_dir).rglob("*")
              if p.suffix.lower() in (".png", ".jpg", ".jpeg")]
-    for path in tqdm(paths, desc="Képek vizsgálata", unit="img"):  
+    for path in tqdm(paths, desc="Képek vizsgálata", unit="img"):
         img = load_image(str(path))
         if img is None:
             continue
@@ -67,7 +71,7 @@ def evaluate(ref_dir, test_dir, out_dir):
     for name in ("SIFT", "ORB"):
         counts.append([stats[name].get(c, {"count": 0})["count"] for c in classes])
         avgs.append([
-            (stats[name].get(c, {"sum": 0})["sum"]/stats[name].get(c, {"count": 0})["count"]
+            (stats[name].get(c, {"sum": 0})["sum"] / stats[name].get(c, {"count": 0})["count"]
              if stats[name].get(c, {"count": 0})["count"] else 0)
             for c in classes
         ])
@@ -75,16 +79,21 @@ def evaluate(ref_dir, test_dir, out_dir):
     output = Path(out_dir)
     output.mkdir(parents=True, exist_ok=True)
 
-
+    # Plot counts per sign
     plt.bar(x - width/2, counts[0], width, label="SIFT")
     plt.bar(x + width/2, counts[1], width, label="ORB")
     plt.xticks(x, classes, rotation=45, ha="right")
+    plt.title("Felismert táblák száma")
+    plt.ylabel("Darabszám")
+    plt.xlabel("Tábla típus")
+    plt.legend(loc="best")
     plt.tight_layout()
     plt.savefig(output / "counts_per_sign.png")
     plt.clf()
 
-
-    avg_classes = [c for c in classes if c != "Ismeretlen"]
+    # Plot average confidence per sign (excluding unknown)
+    exclude = "Nem azonosítható"
+    avg_classes = [c for c in classes if c != exclude]
     idx = [classes.index(c) for c in avg_classes]
     x2 = np.arange(len(avg_classes))
     avgs_filtered = []
@@ -94,10 +103,15 @@ def evaluate(ref_dir, test_dir, out_dir):
     plt.bar(x2 - width/2, avgs_filtered[0], width, label="SIFT")
     plt.bar(x2 + width/2, avgs_filtered[1], width, label="ORB")
     plt.xticks(x2, avg_classes, rotation=45, ha="right")
+    plt.title("Átlagos konfidenciaszint tábla típusonként")
+    plt.ylabel("Konfidenciaszint")
+    plt.xlabel("Tábla típus")
+    plt.axhline(0.5, color="red", linestyle="--", label="50% küszöb")
+    plt.axhline(0.75, color="orange", linestyle="--", label="75% küszöb")
+    plt.legend(loc="best")
     plt.ylim(0, 1)
     plt.tight_layout()
     plt.savefig(output / "avg_conf_per_sign.png")
-
 
 
 if __name__ == "__main__":
@@ -109,4 +123,3 @@ if __name__ == "__main__":
     evaluate(args.ref, args.test, args.out)
     print("Vizsgálat befejeződött.")
     print("Eredmények mentve az", args.out, "mappába.")
-
