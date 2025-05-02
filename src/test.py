@@ -18,10 +18,6 @@ from utils import (
 MIN_MATCH_COUNT = 10
 RATIO_THRESH = 0.85
 
-"""
-This script evaluates reference vs. test images using SIFT and ORB,
-then plots counts and average confidences per class.
-"""
 
 def classify(img, refs, extract_fn, match_fn):
     kps, desc = extract_fn(img)
@@ -91,7 +87,7 @@ def evaluate(ref_dir, test_dir, out_dir):
     plt.savefig(output / "counts_per_sign.png")
     plt.clf()
 
-    # Plot average confidence per sign (excluding unknown)
+    # Plot average confidence per sign
     exclude = "Nem azonosítható"
     avg_classes = [c for c in classes if c != exclude]
     idx = [classes.index(c) for c in avg_classes]
